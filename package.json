@@ -1,0 +1,47 @@
+{
+  "name": "@unosend/node",
+  "version": "1.1.0",
+  "description": "Official Node.js SDK for Unosend - Email API Service",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "unosend",
+    "email",
+    "api",
+    "sdk",
+    "transactional",
+    "email-service"
+  ],
+  "author": "Unosend",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unosend/unosend-node"
+  },
+  "homepage": "https://unosend.co",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
