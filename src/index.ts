@@ -20,18 +20,7 @@ export interface SendEmailOptions {
   cc?: string | string[]
   bcc?: string | string[]
   headers?: Record<string, string>
-  attachments?: Attachment[]
   tags?: Tag[]
-  priority?: 'high' | 'normal' | 'low'
-  templateId?: string
-  templateData?: Record<string, unknown>
-  scheduledFor?: string
-}
-
-export interface Attachment {
-  filename: string
-  content: string | Buffer
-  contentType?: string
 }
 
 export interface Tag {
@@ -44,10 +33,14 @@ export interface Email {
   from: string
   to: string[]
   subject: string
-  status: 'queued' | 'sent' | 'delivered' | 'bounced' | 'complained' | 'failed'
-  createdAt: string
-  sentAt?: string
-  deliveredAt?: string
+  html_content?: string
+  text_content?: string
+  status: string
+  created_at: string
+  sent_at?: string
+  delivered_at?: string
+  opened_at?: string
+  bounced_at?: string
 }
 
 export interface EmailClickData {
@@ -56,76 +49,81 @@ export interface EmailClickData {
   recentClicks: Array<Record<string, unknown>>
 }
 
+export interface BatchSendResult {
+  data: Array<{ id: string }>
+  errors?: Array<{ index: number; message: string }>
+}
+
 // ─── Domain Types ────────────────────────────────────────────────────────────
 
 export interface Domain {
   id: string
   name: string
-  status: 'pending' | 'verified' | 'failed'
-  records: DnsRecord[]
-  createdAt: string
+  status: string
+  records?: DnsRecord[]
+  created_at: string
 }
 
 export interface DnsRecord {
   type: string
   name: string
   value: string
-  ttl: number
+  ttl?: number
 }
 
-// ─── Audience & Contact Types ────────────────────────────────────────────────
+// ─── Audience Types ──────────────────────────────────────────────────────────
 
 export interface Audience {
   id: string
   name: string
-  contactCount: number
-  createdAt: string
+  description?: string
+  created_at: string
 }
+
+// ─── Contact Types ───────────────────────────────────────────────────────────
 
 export interface Contact {
   id: string
   email: string
-  firstName?: string
-  lastName?: string
-  audienceId?: string
-  subscribed?: boolean
-  metadata?: Record<string, unknown>
-  unsubscribed: boolean
-  createdAt: string
+  first_name?: string
+  last_name?: string
+  subscribed: boolean
+  status: string
+  metadata?: Record<string, string>
+  created_at: string
+  updated_at: string
 }
 
 export interface CreateContactOptions {
   email: string
+  audienceId: string
   firstName?: string
   lastName?: string
-  audienceId?: string
   subscribed?: boolean
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, string>
 }
 
 export interface UpdateContactOptions {
   email?: string
   firstName?: string
   lastName?: string
-  audienceId?: string
   subscribed?: boolean
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, string>
 }
 
-export interface BulkContactOptions {
-  contactIds: string[]
-  operation: 'delete' | 'subscribe' | 'unsubscribe' | 'move'
-  audienceId?: string
+export interface BulkCreateContactsOptions {
+  audienceId: string
+  contacts: Array<{
+    email: string
+    firstName?: string
+    lastName?: string
+  }>
 }
 
-export interface ValidateEmailResult {
+export interface ValidateEmailResponse {
   email: string
   valid: boolean
-  score: number
-  suppressed: boolean
   reason?: string
-  suggestion?: string
-  details?: Record<string, unknown>
 }
 
 export interface EnrichOptions {
@@ -149,29 +147,34 @@ export interface EnrichResult {
 export interface Template {
   id: string
   name: string
-  subject: string
-  html?: string
-  text?: string
-  variables?: string[]
-  status?: string
-  createdAt: string
+  subject?: string
+  html_content?: string
+  text_content?: string
+  type: string
+  category: string
+  status: string
+  is_public: boolean
+  thumbnail?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface CreateTemplateOptions {
   name: string
-  subject: string
-  html?: string
-  text?: string
-  variables?: string[]
+  subject?: string
+  htmlContent?: string
+  textContent?: string
+  type?: string
+  category?: string
 }
 
 export interface UpdateTemplateOptions {
   name?: string
   subject?: string
-  html?: string
-  text?: string
-  variables?: string[]
-  status?: string
+  htmlContent?: string
+  textContent?: string
+  type?: string
+  category?: string
 }
 
 export interface RenderedTemplate {
@@ -186,38 +189,47 @@ export interface Broadcast {
   id: string
   name: string
   subject: string
-  from: string
-  replyTo?: string
-  html?: string
-  text?: string
-  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed'
-  audienceId?: string
-  scheduledAt?: string
-  sentAt?: string
-  totalRecipients?: number
-  sentCount?: number
-  createdAt: string
+  from_email: string
+  from_name?: string
+  reply_to?: string
+  audience_id?: string
+  html_content?: string
+  text_content?: string
+  preview_text?: string
+  status: string
+  total_recipients: number
+  sent_count: number
+  failed_count: number
+  scheduled_at?: string
+  sent_at?: string
+  created_at: string
 }
 
 export interface CreateBroadcastOptions {
   name: string
   subject: string
-  from: string
+  fromEmail: string
+  fromName?: string
+  audienceId: string
+  htmlContent?: string
+  textContent?: string
+  previewText?: string
   replyTo?: string
-  html?: string
-  text?: string
-  audienceId?: string
   scheduledAt?: string
 }
 
 export interface UpdateBroadcastOptions {
   name?: string
   subject?: string
-  from?: string
-  html?: string
-  text?: string
+  fromEmail?: string
+  fromName?: string
   audienceId?: string
+  htmlContent?: string
+  textContent?: string
+  previewText?: string
+  replyTo?: string
   scheduledAt?: string | null
+  status?: string
 }
 
 // ─── Webhook Types ───────────────────────────────────────────────────────────
@@ -227,8 +239,7 @@ export interface Webhook {
   url: string
   events: string[]
   enabled: boolean
-  secret?: string
-  createdAt: string
+  created_at: string
 }
 
 export interface CreateWebhookOptions {
@@ -247,40 +258,39 @@ export interface UpdateWebhookOptions {
 export interface InboundEmail {
   id: string
   from: string
-  fromName?: string
+  from_name?: string
   to: string
   cc?: string
   subject: string
-  hasHtml?: boolean
-  hasText?: boolean
+  has_html?: boolean
+  has_text?: boolean
   html?: string
   text?: string
-  attachmentCount?: number
+  attachment_count?: number
   attachments?: InboundAttachment[]
-  receivedAt: string
+  received_at: string
 }
 
 export interface InboundAttachment {
   id: string
   filename: string
-  contentType: string
-  contentDisposition?: string
-  contentId?: string
+  content_type: string
+  content_disposition?: string
+  content_id?: string
   size: number
-  downloadUrl: string
-  expiresAt?: string
+  download_url: string
+  expires_at?: string
 }
 
 export interface InboundReply {
   id: string
-  fromEmail: string
-  toEmails: string[]
+  from_email: string
+  to_emails: string[]
   subject: string
-  htmlContent?: string
-  textContent?: string
-  sentAt: string
-  createdAt: string
-  metadata?: Record<string, unknown>
+  html_content?: string
+  text_content?: string
+  sent_at: string
+  created_at: string
 }
 
 // ─── Suppression Types ───────────────────────────────────────────────────────
@@ -289,32 +299,30 @@ export interface Suppression {
   id: string
   email: string
   reason: string
-  sourceEmailId?: string
+  source_email_id?: string
   metadata?: Record<string, unknown>
-  createdAt: string
+  created_at: string
 }
 
 // ─── Event & Log Types ───────────────────────────────────────────────────────
 
 export interface EmailEvent {
   id: string
-  emailId: string
-  eventType: string
+  email_id: string
+  event_type: string
   metadata?: Record<string, unknown>
-  createdAt: string
+  created_at: string
 }
 
 export interface EmailLog {
   id: string
-  fromEmail: string
-  toEmails: string[]
+  from_email: string
+  to_emails: string[]
   subject: string
   status: string
-  createdAt: string
-  sentAt?: string
-  deliveredAt?: string
-  scheduledFor?: string
-  metadata?: Record<string, unknown>
+  created_at: string
+  sent_at?: string
+  delivered_at?: string
 }
 
 // ─── Metrics Types ───────────────────────────────────────────────────────────
@@ -326,17 +334,16 @@ export interface Metrics {
   bounced: number
   failed: number
   queued: number
-  scheduled: number
   opens: number
-  uniqueOpens: number
+  unique_opens: number
   clicks: number
-  uniqueClicks: number
+  unique_clicks: number
 }
 
 export interface LinkMetrics {
   period: { days: number; start: string; end: string }
   links: Array<{ url: string; count: number }>
-  totalClicks: number
+  total_clicks: number
 }
 
 // ─── Workspace Types ─────────────────────────────────────────────────────────
@@ -345,10 +352,10 @@ export interface Workspace {
   id: string
   name: string
   slug: string
-  iconUrl?: string
-  ownerId: string
+  icon_url?: string
+  owner_id: string
   role: string
-  createdAt: string
+  created_at: string
 }
 
 // ─── API Key Types ───────────────────────────────────────────────────────────
@@ -357,11 +364,46 @@ export interface ApiKeyInfo {
   id: string
   name: string
   key?: string
-  keyPrefix: string
-  createdAt: string
+  key_prefix: string
+  created_at: string
+}
+
+// ─── Wallet & Subscription Types ─────────────────────────────────────────────
+
+export interface WalletInfo {
+  balance: number
+  auto_recharge: boolean
+  auto_recharge_amount?: number
+  auto_recharge_threshold?: number
+}
+
+export interface WalletTransaction {
+  id: string
+  type: string
+  amount: number
+  balance_before: number
+  balance_after: number
+  description: string
+  reference_id?: string
+  created_at: string
+}
+
+export interface SubscriptionInfo {
+  tier_id: string
+  status: string
+  email_limit: number
+  current_period_start?: string
+  current_period_end?: string
 }
 
 // ─── Common Types ────────────────────────────────────────────────────────────
+
+export interface PaginationMeta {
+  total: number
+  page: number
+  page_size: number
+  pages: number
+}
 
 export interface UnosendError {
   message: string
@@ -369,22 +411,16 @@ export interface UnosendError {
   statusCode?: number
 }
 
-export interface Pagination {
-  total?: number
-  limit: number
-  offset?: number
-  cursor?: string
-  hasMore: boolean
-}
-
 type ApiResponse<T> = { data: T | null; error: UnosendError | null }
+
+type PaginatedResponse<T> = ApiResponse<T> & { meta?: PaginationMeta }
 
 // ─── Resource Classes ────────────────────────────────────────────────────────
 
 class Emails {
   constructor(private client: Unosend) {}
 
-  async send(options: SendEmailOptions): Promise<ApiResponse<Email>> {
+  async send(options: SendEmailOptions): Promise<ApiResponse<{ id: string }>> {
     const payload: Record<string, unknown> = {
       from: options.from,
       to: Array.isArray(options.to) ? options.to : [options.to],
@@ -398,26 +434,11 @@ class Emails {
     if (options.bcc) payload.bcc = Array.isArray(options.bcc) ? options.bcc : [options.bcc]
     if (options.headers) payload.headers = options.headers
     if (options.tags) payload.tags = options.tags
-    if (options.priority) payload.priority = options.priority
-    if (options.templateId) payload.template_id = options.templateId
-    if (options.templateData) payload.template_data = options.templateData
-    if (options.scheduledFor) payload.scheduled_for = options.scheduledFor
-    if (options.attachments) {
-      payload.attachments = options.attachments.map(att => ({
-        filename: att.filename,
-        content: typeof att.content === 'string' ? att.content : att.content.toString('base64'),
-        content_type: att.contentType,
-      }))
-    }
 
-    return this.client['_request']<Email>('POST', '/emails', payload)
+    return this.client['_request']('POST', '/emails', payload)
   }
 
-  async batch(emails: SendEmailOptions[]): Promise<ApiResponse<{
-    data: Array<{ id: string; from: string; to: string[]; created_at: string } | { error: string; index: number }>
-    success_count: number
-    error_count: number
-  }>> {
+  async batch(emails: SendEmailOptions[]): Promise<ApiResponse<BatchSendResult>> {
     if (emails.length === 0 || emails.length > 100) {
       return {
         data: null,
@@ -439,28 +460,22 @@ class Emails {
       if (options.bcc) email.bcc = Array.isArray(options.bcc) ? options.bcc : [options.bcc]
       if (options.headers) email.headers = options.headers
       if (options.tags) email.tags = options.tags
-      if (options.attachments) {
-        email.attachments = options.attachments.map(att => ({
-          filename: att.filename,
-          content: typeof att.content === 'string' ? att.content : att.content.toString('base64'),
-          content_type: att.contentType,
-        }))
-      }
 
       return email
     })
 
-    return this.client['_request']('POST', '/emails/batch', payload)
+    return this.client['_request']('POST', '/emails/batch', { emails: payload })
   }
 
   async get(id: string): Promise<ApiResponse<Email>> {
     return this.client['_request']<Email>('GET', `/emails/${encodeURIComponent(id)}`)
   }
 
-  async list(options?: { limit?: number; offset?: number }): Promise<ApiResponse<Email[]>> {
+  async list(options?: { page?: number; perPage?: number; status?: string }): Promise<PaginatedResponse<Email[]>> {
     const params = new URLSearchParams()
-    if (options?.limit) params.set('limit', options.limit.toString())
-    if (options?.offset) params.set('offset', options.offset.toString())
+    if (options?.page) params.set('page', options.page.toString())
+    if (options?.perPage) params.set('per_page', options.perPage.toString())
+    if (options?.status) params.set('status', options.status)
     const query = params.toString() ? `?${params.toString()}` : ''
     return this.client['_request']<Email[]>('GET', `/emails${query}`)
   }
@@ -539,8 +554,10 @@ class Domains {
 class Audiences {
   constructor(private client: Unosend) {}
 
-  async create(name: string): Promise<ApiResponse<Audience>> {
-    return this.client['_request']<Audience>('POST', '/audiences', { name })
+  async create(name: string, description?: string): Promise<ApiResponse<Audience>> {
+    const payload: Record<string, unknown> = { name }
+    if (description) payload.description = description
+    return this.client['_request']<Audience>('POST', '/audiences', payload)
   }
 
   async get(id: string): Promise<ApiResponse<Audience>> {
@@ -549,6 +566,10 @@ class Audiences {
 
   async list(): Promise<ApiResponse<Audience[]>> {
     return this.client['_request']<Audience[]>('GET', '/audiences')
+  }
+
+  async update(id: string, data: { name?: string; description?: string }): Promise<ApiResponse<Audience>> {
+    return this.client['_request']<Audience>('PATCH', `/audiences/${encodeURIComponent(id)}`, data)
   }
 
   async delete(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
@@ -560,10 +581,12 @@ class Contacts {
   constructor(private client: Unosend) {}
 
   async create(options: CreateContactOptions): Promise<ApiResponse<Contact>> {
-    const payload: Record<string, unknown> = { email: options.email }
+    const payload: Record<string, unknown> = {
+      email: options.email,
+      audience_id: options.audienceId,
+    }
     if (options.firstName) payload.first_name = options.firstName
     if (options.lastName) payload.last_name = options.lastName
-    if (options.audienceId) payload.audience_id = options.audienceId
     if (options.subscribed !== undefined) payload.subscribed = options.subscribed
     if (options.metadata) payload.metadata = options.metadata
     return this.client['_request']<Contact>('POST', '/contacts', payload)
@@ -573,8 +596,12 @@ class Contacts {
     return this.client['_request']<Contact>('GET', `/contacts/${encodeURIComponent(id)}`)
   }
 
-  async list(audienceId: string): Promise<ApiResponse<Contact[]>> {
-    return this.client['_request']<Contact[]>('GET', `/contacts?audienceId=${encodeURIComponent(audienceId)}`)
+  async list(options?: { page?: number; perPage?: number }): Promise<PaginatedResponse<Contact[]>> {
+    const params = new URLSearchParams()
+    if (options?.page) params.set('page', options.page.toString())
+    if (options?.perPage) params.set('per_page', options.perPage.toString())
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return this.client['_request']<Contact[]>('GET', `/contacts${query}`)
   }
 
   async update(id: string, data: UpdateContactOptions): Promise<ApiResponse<Contact>> {
@@ -582,31 +609,30 @@ class Contacts {
     if (data.email) payload.email = data.email
     if (data.firstName) payload.first_name = data.firstName
     if (data.lastName) payload.last_name = data.lastName
-    if (data.audienceId) payload.audience_id = data.audienceId
     if (data.subscribed !== undefined) payload.subscribed = data.subscribed
     if (data.metadata) payload.metadata = data.metadata
     return this.client['_request']<Contact>('PATCH', `/contacts/${encodeURIComponent(id)}`, payload)
   }
 
-  async delete(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+  async delete(id: string): Promise<ApiResponse<void>> {
     return this.client['_request']('DELETE', `/contacts/${encodeURIComponent(id)}`)
   }
 
-  async bulk(options: BulkContactOptions): Promise<ApiResponse<{ affectedCount: number; invalidCount: number }>> {
-    const payload: Record<string, unknown> = {
-      contact_ids: options.contactIds,
-      operation: options.operation,
+  async bulkCreate(options: BulkCreateContactsOptions): Promise<ApiResponse<Record<string, unknown>>> {
+    const payload = {
+      audience_id: options.audienceId,
+      contacts: options.contacts.map(c => {
+        const entry: Record<string, unknown> = { email: c.email }
+        if (c.firstName) entry.first_name = c.firstName
+        if (c.lastName) entry.last_name = c.lastName
+        return entry
+      }),
     }
-    if (options.audienceId) payload.audience_id = options.audienceId
     return this.client['_request']('POST', '/contacts/bulk', payload)
   }
 
-  async validate(email: string): Promise<ApiResponse<ValidateEmailResult>> {
-    return this.client['_request']<ValidateEmailResult>('GET', `/contacts/validate?email=${encodeURIComponent(email)}`)
-  }
-
-  async validateBatch(emails: string[]): Promise<ApiResponse<ValidateEmailResult[]>> {
-    return this.client['_request']<ValidateEmailResult[]>('POST', '/contacts/validate', { emails })
+  async validate(email: string): Promise<ApiResponse<ValidateEmailResponse>> {
+    return this.client['_request']<ValidateEmailResponse>('POST', '/contacts/validate', { email })
   }
 
   async enrich(options: EnrichOptions): Promise<ApiResponse<EnrichResult | EnrichResult[]>> {
@@ -615,9 +641,9 @@ class Contacts {
     if (options.name) payload.name = options.name
     if (options.emails) payload.emails = options.emails
     if (options.names) payload.names = options.names
-    if (options.contactIds) payload.contactIds = options.contactIds
-    if (options.audienceId) payload.audienceId = options.audienceId
-    if (options.updateContacts !== undefined) payload.updateContacts = options.updateContacts
+    if (options.contactIds) payload.contact_ids = options.contactIds
+    if (options.audienceId) payload.audience_id = options.audienceId
+    if (options.updateContacts !== undefined) payload.update_contacts = options.updateContacts
     return this.client['_request']('POST', '/contacts/enrich', payload)
   }
 
@@ -631,21 +657,54 @@ class Contacts {
     const query = params.toString() ? `?${params.toString()}` : ''
     return this.client['_request']('GET', `/contacts/export${query}`)
   }
+
+  async import(options: {
+    audienceId: string
+    file: string
+    format?: string
+  }): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.client['_request']('POST', '/contacts/import', {
+      audience_id: options.audienceId,
+      file: options.file,
+      format: options.format || 'csv',
+    })
+  }
 }
 
 class Templates {
   constructor(private client: Unosend) {}
 
   async create(options: CreateTemplateOptions): Promise<ApiResponse<Template>> {
-    return this.client['_request']<Template>('POST', '/templates', { ...options } as Record<string, unknown>)
+    const payload: Record<string, unknown> = { name: options.name }
+    if (options.subject) payload.subject = options.subject
+    if (options.htmlContent) payload.html_content = options.htmlContent
+    if (options.textContent) payload.text_content = options.textContent
+    if (options.type) payload.type = options.type
+    if (options.category) payload.category = options.category
+    return this.client['_request']<Template>('POST', '/templates', payload)
   }
 
   async get(id: string): Promise<ApiResponse<Template>> {
     return this.client['_request']<Template>('GET', `/templates/${encodeURIComponent(id)}`)
   }
 
+  async list(): Promise<ApiResponse<Template[]>> {
+    return this.client['_request']<Template[]>('GET', '/templates')
+  }
+
   async update(id: string, data: UpdateTemplateOptions): Promise<ApiResponse<Template>> {
-    return this.client['_request']<Template>('PATCH', `/templates/${encodeURIComponent(id)}`, data as Record<string, unknown>)
+    const payload: Record<string, unknown> = {}
+    if (data.name !== undefined) payload.name = data.name
+    if (data.subject !== undefined) payload.subject = data.subject
+    if (data.htmlContent !== undefined) payload.html_content = data.htmlContent
+    if (data.textContent !== undefined) payload.text_content = data.textContent
+    if (data.type !== undefined) payload.type = data.type
+    if (data.category !== undefined) payload.category = data.category
+    return this.client['_request']<Template>('PATCH', `/templates/${encodeURIComponent(id)}`, payload)
+  }
+
+  async delete(id: string): Promise<ApiResponse<void>> {
+    return this.client['_request']('DELETE', `/templates/${encodeURIComponent(id)}`)
   }
 
   async render(id: string, data?: Record<string, string>): Promise<ApiResponse<RenderedTemplate>> {
@@ -664,12 +723,14 @@ class Broadcasts {
     const payload: Record<string, unknown> = {
       name: options.name,
       subject: options.subject,
-      from: options.from,
+      from_email: options.fromEmail,
+      audience_id: options.audienceId,
     }
+    if (options.fromName) payload.from_name = options.fromName
     if (options.replyTo) payload.reply_to = options.replyTo
-    if (options.html) payload.html = options.html
-    if (options.text) payload.text = options.text
-    if (options.audienceId) payload.audience_id = options.audienceId
+    if (options.htmlContent) payload.html_content = options.htmlContent
+    if (options.textContent) payload.text_content = options.textContent
+    if (options.previewText) payload.preview_text = options.previewText
     if (options.scheduledAt) payload.scheduled_at = options.scheduledAt
     return this.client['_request']<Broadcast>('POST', '/broadcasts', payload)
   }
@@ -678,16 +739,28 @@ class Broadcasts {
     return this.client['_request']<Broadcast>('GET', `/broadcasts/${encodeURIComponent(id)}`)
   }
 
+  async list(): Promise<ApiResponse<Broadcast[]>> {
+    return this.client['_request']<Broadcast[]>('GET', '/broadcasts')
+  }
+
   async update(id: string, data: UpdateBroadcastOptions): Promise<ApiResponse<Broadcast>> {
     const payload: Record<string, unknown> = {}
-    if (data.name) payload.name = data.name
-    if (data.subject) payload.subject = data.subject
-    if (data.from) payload.from = data.from
-    if (data.html) payload.html = data.html
-    if (data.text) payload.text = data.text
-    if (data.audienceId) payload.audience_id = data.audienceId
+    if (data.name !== undefined) payload.name = data.name
+    if (data.subject !== undefined) payload.subject = data.subject
+    if (data.fromEmail !== undefined) payload.from_email = data.fromEmail
+    if (data.fromName !== undefined) payload.from_name = data.fromName
+    if (data.replyTo !== undefined) payload.reply_to = data.replyTo
+    if (data.audienceId !== undefined) payload.audience_id = data.audienceId
+    if (data.htmlContent !== undefined) payload.html_content = data.htmlContent
+    if (data.textContent !== undefined) payload.text_content = data.textContent
+    if (data.previewText !== undefined) payload.preview_text = data.previewText
     if (data.scheduledAt !== undefined) payload.scheduled_at = data.scheduledAt
+    if (data.status !== undefined) payload.status = data.status
     return this.client['_request']<Broadcast>('PATCH', `/broadcasts/${encodeURIComponent(id)}`, payload)
+  }
+
+  async delete(id: string): Promise<ApiResponse<void>> {
+    return this.client['_request']('DELETE', `/broadcasts/${encodeURIComponent(id)}`)
   }
 
   async send(id: string): Promise<ApiResponse<{ message: string }>> {
@@ -699,15 +772,23 @@ class Webhooks {
   constructor(private client: Unosend) {}
 
   async create(options: CreateWebhookOptions): Promise<ApiResponse<Webhook>> {
-    return this.client['_request']<Webhook>('POST', '/webhooks', { ...options } as Record<string, unknown>)
+    return this.client['_request']<Webhook>('POST', '/webhooks', { ...options })
   }
 
   async get(id: string): Promise<ApiResponse<Webhook>> {
     return this.client['_request']<Webhook>('GET', `/webhooks/${encodeURIComponent(id)}`)
   }
 
+  async list(): Promise<ApiResponse<Webhook[]>> {
+    return this.client['_request']<Webhook[]>('GET', '/webhooks')
+  }
+
   async update(id: string, data: UpdateWebhookOptions): Promise<ApiResponse<Webhook>> {
-    return this.client['_request']<Webhook>('PATCH', `/webhooks/${encodeURIComponent(id)}`, data as Record<string, unknown>)
+    return this.client['_request']<Webhook>('PATCH', `/webhooks/${encodeURIComponent(id)}`, { ...data })
+  }
+
+  async delete(id: string): Promise<ApiResponse<void>> {
+    return this.client['_request']('DELETE', `/webhooks/${encodeURIComponent(id)}`)
   }
 }
 
@@ -715,13 +796,13 @@ class InboundEmails {
   constructor(private client: Unosend) {}
 
   async list(options?: {
-    limit?: number
-    offset?: number
+    page?: number
+    pageSize?: number
     status?: string
-  }): Promise<ApiResponse<InboundEmail[]>> {
+  }): Promise<PaginatedResponse<InboundEmail[]>> {
     const params = new URLSearchParams()
-    if (options?.limit) params.set('limit', options.limit.toString())
-    if (options?.offset) params.set('offset', options.offset.toString())
+    if (options?.page) params.set('page', options.page.toString())
+    if (options?.pageSize) params.set('page_size', options.pageSize.toString())
     if (options?.status) params.set('status', options.status)
     const query = params.toString() ? `?${params.toString()}` : ''
     return this.client['_request']<InboundEmail[]>('GET', `/inbound${query}`)
@@ -729,10 +810,6 @@ class InboundEmails {
 
   async get(id: string): Promise<ApiResponse<InboundEmail>> {
     return this.client['_request']<InboundEmail>('GET', `/inbound/${encodeURIComponent(id)}`)
-  }
-
-  async delete(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return this.client['_request']('DELETE', `/inbound/${encodeURIComponent(id)}`)
   }
 
   async reply(id: string, options: { html?: string; text?: string }): Promise<ApiResponse<Record<string, unknown>>> {
@@ -762,19 +839,19 @@ class Suppressions {
   }
 
   async list(options?: {
-    cursor?: string
-    limit?: number
+    page?: number
+    perPage?: number
     reason?: string
-  }): Promise<ApiResponse<Suppression[]> & { pagination?: Pagination }> {
+  }): Promise<PaginatedResponse<Suppression[]>> {
     const params = new URLSearchParams()
-    if (options?.cursor) params.set('cursor', options.cursor)
-    if (options?.limit) params.set('limit', options.limit.toString())
+    if (options?.page) params.set('page', options.page.toString())
+    if (options?.perPage) params.set('per_page', options.perPage.toString())
     if (options?.reason) params.set('reason', options.reason)
     const query = params.toString() ? `?${params.toString()}` : ''
     return this.client['_request']('GET', `/suppressions${query}`)
   }
 
-  async delete(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
+  async delete(id: string): Promise<ApiResponse<void>> {
     return this.client['_request']('DELETE', `/suppressions/${encodeURIComponent(id)}`)
   }
 }
@@ -788,7 +865,7 @@ class Events {
     days?: number
     limit?: number
     offset?: number
-  }): Promise<ApiResponse<EmailEvent[]> & { pagination?: Pagination }> {
+  }): Promise<ApiResponse<EmailEvent[]>> {
     const params = new URLSearchParams()
     if (options?.emailId) params.set('email_id', options.emailId)
     if (options?.eventType) params.set('event_type', options.eventType)
@@ -810,7 +887,7 @@ class Logs {
     limit?: number
     offset?: number
     search?: string
-  }): Promise<ApiResponse<EmailLog[]> & { pagination?: Pagination }> {
+  }): Promise<ApiResponse<EmailLog[]>> {
     const params = new URLSearchParams()
     if (options?.status) params.set('status', options.status)
     if (options?.emailId) params.set('email_id', options.emailId)
@@ -856,6 +933,10 @@ class ApiKeys {
     return this.client['_request']<ApiKeyInfo>('POST', '/api-keys', { name })
   }
 
+  async list(): Promise<ApiResponse<ApiKeyInfo[]>> {
+    return this.client['_request']<ApiKeyInfo[]>('GET', '/api-keys')
+  }
+
   async delete(id: string): Promise<ApiResponse<{ message: string }>> {
     return this.client['_request']('DELETE', `/api-keys/${encodeURIComponent(id)}`)
   }
@@ -884,6 +965,34 @@ class Workspaces {
     if (data.iconUrl) payload.icon_url = data.iconUrl
     return this.client['_request']<Workspace>('PATCH', `/workspaces/${encodeURIComponent(id)}`, payload)
   }
+
+  async delete(id: string): Promise<ApiResponse<void>> {
+    return this.client['_request']('DELETE', `/workspaces/${encodeURIComponent(id)}`)
+  }
+}
+
+class Wallet {
+  constructor(private client: Unosend) {}
+
+  async get(): Promise<ApiResponse<WalletInfo>> {
+    return this.client['_request']<WalletInfo>('GET', '/wallet')
+  }
+
+  async addFunds(amount: number): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.client['_request']('POST', '/wallet/add-funds', { amount })
+  }
+
+  async transactions(): Promise<ApiResponse<WalletTransaction[]>> {
+    return this.client['_request']<WalletTransaction[]>('GET', '/wallet/transactions')
+  }
+}
+
+class Subscription {
+  constructor(private client: Unosend) {}
+
+  async get(): Promise<ApiResponse<SubscriptionInfo>> {
+    return this.client['_request']<SubscriptionInfo>('GET', '/subscription')
+  }
 }
 
 class Usage {
@@ -895,17 +1004,9 @@ class Usage {
   }
 }
 
-class Billing {
-  constructor(private client: Unosend) {}
-
-  async get(): Promise<ApiResponse<Record<string, unknown>>> {
-    return this.client['_request']('GET', '/billing')
-  }
-}
-
 // ─── Main Client ─────────────────────────────────────────────────────────────
 
-const SDK_VERSION = '2.0.0'
+const SDK_VERSION = '2.1.0'
 
 export class Unosend {
   private apiKey: string
@@ -925,8 +1026,9 @@ export class Unosend {
   public metrics: MetricsApi
   public apiKeys: ApiKeys
   public workspaces: Workspaces
+  public wallet: Wallet
+  public subscription: Subscription
   public usage: Usage
-  public billing: Billing
 
   constructor(apiKey: string, options?: { baseUrl?: string }) {
     if (!apiKey) {
@@ -934,7 +1036,7 @@ export class Unosend {
     }
 
     this.apiKey = apiKey
-    this.baseUrl = options?.baseUrl || 'https://www.unosend.co/api/v1'
+    this.baseUrl = options?.baseUrl || 'https://api.unosend.co/v1'
 
     this.emails = new Emails(this)
     this.domains = new Domains(this)
@@ -950,8 +1052,9 @@ export class Unosend {
     this.metrics = new MetricsApi(this)
     this.apiKeys = new ApiKeys(this)
     this.workspaces = new Workspaces(this)
+    this.wallet = new Wallet(this)
+    this.subscription = new Subscription(this)
     this.usage = new Usage(this)
-    this.billing = new Billing(this)
   }
 
   /** @internal */
@@ -959,13 +1062,16 @@ export class Unosend {
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     body?: Record<string, unknown> | Record<string, unknown>[]
-  ): Promise<{ data: T | null; error: UnosendError | null }> {
+  ): Promise<{ data: T | null; error: UnosendError | null; meta?: PaginationMeta }> {
     const url = `${this.baseUrl}${path}`
 
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.apiKey}`,
-      'Content-Type': 'application/json',
       'User-Agent': `unosend-node/${SDK_VERSION}`,
+    }
+
+    if (body) {
+      headers['Content-Type'] = 'application/json'
     }
 
     let retries = 0
@@ -990,6 +1096,11 @@ export class Unosend {
           continue
         }
 
+        // 204 No Content
+        if (response.status === 204) {
+          return { data: null as T, error: null }
+        }
+
         const json = await response.json() as Record<string, unknown>
 
         if (!response.ok) {
@@ -1004,9 +1115,10 @@ export class Unosend {
           }
         }
 
-        // Handle both { data: ... } and direct response shapes
+        // Extract data and optional pagination meta
         const data = (json.data !== undefined ? json.data : json) as T
-        return { data, error: null }
+        const meta = json.meta as PaginationMeta | undefined
+        return { data, error: null, meta }
       } catch (err) {
         if (retries < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, retries), 10000)))
