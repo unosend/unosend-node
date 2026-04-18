@@ -6,6 +6,15 @@
 export interface UnosendConfig {
   apiKey: string
   baseUrl?: string
+  /**
+   * Optional `AbortSignal` for all requests (e.g. cancellation). If set, `timeout` is ignored.
+   */
+  signal?: AbortSignal
+  /**
+   * Per-request timeout in milliseconds. Uses `AbortSignal.timeout` when supported.
+   * Ignored when `signal` is provided.
+   */
+  timeout?: number
 }
 
 // ─── Email Types ─────────────────────────────────────────────────────────────
@@ -576,14 +585,17 @@ class Suppressions {
   }
 
   async deleteByEmail(email: string): Promise<ApiResponse<{ id: string }>> {
-    // Look up the suppression by listing and filtering, then delete by ID
-    const { data: list, error: listErr } = await this.list({ perPage: 100 })
-    if (listErr) return { data: null, error: listErr }
-    const match = list?.find(s => s.email === email)
-    if (!match) {
-      return { data: null, error: { message: `No suppression found for ${email}`, code: 404 } }
+    let page = 1
+    const perPage = 100
+    while (true) {
+      const { data: list, error: listErr } = await this.list({ perPage, page })
+      if (listErr) return { data: null, error: listErr }
+      const match = list?.find(s => s.email === email)
+      if (match) return this.delete(match.id)
+      if (!list || list.length < perPage) break
+      page++
     }
-    return this.delete(match.id)
+    return { data: null, error: { message: `No suppression found for ${email}`, code: 404 } }
   }
 }
 
@@ -612,6 +624,8 @@ const SDK_VERSION = '3.0.0'
 export class Unosend {
   private apiKey: string
   private baseUrl: string
+  private requestSignal?: AbortSignal
+  private requestTimeoutMs?: number
 
   public emails: Emails
   public domains: Domains
@@ -631,6 +645,11 @@ export class Unosend {
 
     this.apiKey = config.apiKey
     this.baseUrl = config.baseUrl || 'https://api.unosend.co'
+    if (config.signal) {
+      this.requestSignal = config.signal
+    } else if (config.timeout !== undefined && config.timeout > 0) {
+      this.requestTimeoutMs = config.timeout
+    }
 
     this.emails = new Emails(this)
     this.domains = new Domains(this)
@@ -645,6 +664,36 @@ export class Unosend {
   }
 
   /** @internal */
+  private _fetchInit(
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    body?: Record<string, unknown> | Record<string, unknown>[]
+  ): RequestInit {
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'User-Agent': `unosend-node/${SDK_VERSION}`,
+      'Accept': 'application/json',
+    }
+
+    if (body) {
+      headers['Content-Type'] = 'application/json'
+    }
+
+    let signal: AbortSignal | undefined
+    if (this.requestSignal) {
+      signal = this.requestSignal
+    } else if (this.requestTimeoutMs !== undefined && typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+      signal = AbortSignal.timeout(this.requestTimeoutMs)
+    }
+
+    return {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal,
+    }
+  }
+
+  /** @internal */
   private async _request<T>(
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
@@ -652,25 +701,12 @@ export class Unosend {
   ): Promise<{ data: T | null; error: UnosendError | null; meta?: PaginationMeta }> {
     const url = `${this.baseUrl}${path}`
 
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.apiKey}`,
-      'User-Agent': `unosend-node/${SDK_VERSION}`,
-    }
-
-    if (body) {
-      headers['Content-Type'] = 'application/json'
-    }
-
     let retries = 0
     const maxRetries = 3
 
     while (true) {
       try {
-        const response = await fetch(url, {
-          method,
-          headers,
-          body: body ? JSON.stringify(body) : undefined,
-        })
+        const response = await fetch(url, this._fetchInit(method, body))
 
         // Retry on 429 with exponential backoff
         if (response.status === 429 && retries < maxRetries) {
@@ -688,7 +724,20 @@ export class Unosend {
           return { data: null as T, error: null }
         }
 
-        const json = await response.json() as Record<string, unknown>
+        const rawText = await response.text()
+        let json: Record<string, unknown>
+        try {
+          json = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {}
+        } catch {
+          return {
+            data: null,
+            error: {
+              message: 'Response was not valid JSON',
+              code: 0,
+              statusCode: response.status,
+            },
+          }
+        }
 
         if (!response.ok) {
           const errorObj = json.error as { message?: string; code?: number } | undefined
@@ -707,19 +756,18 @@ export class Unosend {
         const meta = json.meta as PaginationMeta | undefined
         return { data, error: null, meta }
       } catch (err) {
-        if (retries < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, retries), 10000)))
-          retries++
-          continue
+        const isAbort = err instanceof Error && err.name === 'AbortError'
+        if (isAbort || retries >= maxRetries) {
+          return {
+            data: null,
+            error: {
+              message: err instanceof Error ? err.message : 'Network error',
+              code: 0,
+            },
+          }
         }
-
-        return {
-          data: null,
-          error: {
-            message: err instanceof Error ? err.message : 'Network error',
-            code: 0,
-          },
-        }
+        await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, retries), 10000)))
+        retries++
       }
     }
   }
@@ -730,13 +778,7 @@ export class Unosend {
     path: string,
   ): Promise<Response> {
     const url = `${this.baseUrl}${path}`
-
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.apiKey}`,
-      'User-Agent': `unosend-node/${SDK_VERSION}`,
-    }
-
-    return fetch(url, { method, headers })
+    return fetch(url, this._fetchInit(method))
   }
 }
 
