@@ -13,7 +13,7 @@ npm install @unosend/node
 ```typescript
 import { Unosend } from '@unosend/node';
 
-const unosend = new Unosend('un_your_api_key');
+const unosend = new Unosend({ apiKey: 'un_your_api_key' });
 
 const { data, error } = await unosend.emails.send({
   from: 'hello@yourdomain.com',
@@ -32,29 +32,24 @@ if (error) {
 ## Configuration
 
 ```typescript
-const unosend = new Unosend('un_your_api_key', {
-  baseUrl: 'https://api.unosend.co/v1'  // default
+const unosend = new Unosend({
+  apiKey: 'un_your_api_key',
+  baseUrl: 'https://api.unosend.co'  // default
 });
 ```
 
 ## Features
 
-- **Emails** — Send, batch, resend, cancel, export, track clicks
+- **Emails** — Send, batch send, list, and retrieve emails
 - **Domains** — Add, verify, and manage sending domains
 - **Audiences** — Create and manage contact lists
-- **Contacts** — CRUD, bulk create, validate, enrich, import/export
-- **Templates** — Create, render, duplicate email templates
+- **Contacts** — Create, list, update, delete, and validate contacts
+- **Templates** — Create, list, update, and delete email templates
 - **Broadcasts** — Create and send email campaigns
 - **Webhooks** — Manage delivery event webhooks
-- **Inbound** — Receive and reply to incoming emails
+- **Inbound** — Receive incoming emails and download attachments
 - **Suppressions** — Manage email suppression list
-- **Events & Logs** — Query delivery events and email logs
-- **Metrics** — Email analytics and link tracking
-- **API Keys** — Create and revoke API keys
-- **Workspaces** — Multi-workspace management
-- **Wallet** — Check balance, add funds, view transactions
-- **Subscription** — View current subscription
-- **Usage** — Query usage stats
+- **API Keys** — Create, list, and revoke API keys
 
 ## API Reference
 
@@ -71,8 +66,29 @@ const { data, error } = await unosend.emails.send({
   replyTo: 'support@yourdomain.com',
   cc: ['cc@example.com'],
   bcc: ['bcc@example.com'],
+  priority: 'high',
   headers: { 'X-Custom-Header': 'value' },
   tags: [{ name: 'campaign', value: 'welcome' }],
+  tracking: { open: true, click: true },
+  scheduledFor: '2026-01-20T10:00:00Z',
+});
+
+// Send with a template
+const { data, error } = await unosend.emails.send({
+  from: 'you@yourdomain.com',
+  to: 'user@example.com',
+  subject: 'Welcome!',
+  templateId: 'tpl_abc123',
+  templateData: { first_name: 'John', company: 'Acme' },
+});
+
+// Send with attachments
+const { data, error } = await unosend.emails.send({
+  from: 'you@yourdomain.com',
+  to: 'user@example.com',
+  subject: 'Your invoice',
+  html: '<p>Please find attached.</p>',
+  attachments: [{ filename: 'invoice.pdf', content: base64Content, content_type: 'application/pdf' }],
 });
 
 // Batch send (up to 100 emails)
@@ -85,22 +101,7 @@ const { data, error } = await unosend.emails.batch([
 const { data, error } = await unosend.emails.get('email_id');
 
 // List emails (paginated)
-const { data, error } = await unosend.emails.list({ page: 1, perPage: 50 });
-
-// Cancel a scheduled email
-const { data, error } = await unosend.emails.cancel('email_id');
-
-// Resend an email
-const { data, error } = await unosend.emails.resend('email_id');
-
-// Get click data
-const { data, error } = await unosend.emails.clicks('email_id');
-
-// Export emails
-const { data, error } = await unosend.emails.export({ status: 'delivered', format: 'csv' });
-
-// Check email delivery status
-const { data, error } = await unosend.emails.status({ since: '2026-01-01' });
+const { data, error, meta } = await unosend.emails.list({ page: 1, perPage: 50, status: 'delivered' });
 ```
 
 ### Domains
@@ -118,9 +119,6 @@ const { data, error } = await unosend.domains.get('domain_id');
 // Verify DNS records
 const { data, error } = await unosend.domains.verify('domain_id');
 
-// Check DNS status
-const { data, error } = await unosend.domains.dnsStatus('domain_id');
-
 // Delete domain
 const { data, error } = await unosend.domains.delete('domain_id');
 ```
@@ -137,9 +135,6 @@ const { data, error } = await unosend.audiences.list();
 // Get audience
 const { data, error } = await unosend.audiences.get('audience_id');
 
-// Update audience
-const { data, error } = await unosend.audiences.update('audience_id', { name: 'New Name' });
-
 // Delete audience
 const { data, error } = await unosend.audiences.delete('audience_id');
 ```
@@ -150,13 +145,17 @@ const { data, error } = await unosend.audiences.delete('audience_id');
 // Create a contact
 const { data, error } = await unosend.contacts.create({
   email: 'user@example.com',
+  audienceId: 'audience_id',
   firstName: 'John',
   lastName: 'Doe',
-  audienceId: 'audience_id',
 });
 
-// List contacts (paginated)
-const { data, error } = await unosend.contacts.list({ page: 1, perPage: 50 });
+// List contacts (paginated, with audience filter)
+const { data, error, meta } = await unosend.contacts.list({
+  audienceId: 'audience_id',
+  page: 1,
+  perPage: 50,
+});
 
 // Get contact
 const { data, error } = await unosend.contacts.get('contact_id');
@@ -164,36 +163,20 @@ const { data, error } = await unosend.contacts.get('contact_id');
 // Update contact
 const { data, error } = await unosend.contacts.update('contact_id', {
   firstName: 'Jane',
-  metadata: { plan: 'pro' },
+  unsubscribed: true,
 });
 
 // Delete contact
 const { data, error } = await unosend.contacts.delete('contact_id');
 
-// Bulk create contacts
-const { data, error } = await unosend.contacts.bulkCreate({
-  audienceId: 'audience_id',
-  contacts: [
-    { email: 'a@example.com', firstName: 'Alice' },
-    { email: 'b@example.com', firstName: 'Bob' },
-  ],
-});
-
-// Validate email (POST)
+// Validate email
 const { data, error } = await unosend.contacts.validate('user@example.com');
-// data.valid, data.score, data.suppressed
 
-// Enrich contacts (gender detection)
-const { data, error } = await unosend.contacts.enrich({ email: 'john@example.com' });
-
-// Export contacts
-const { data, error } = await unosend.contacts.export({ audienceId: 'aud_id', format: 'csv' });
-
-// Import contacts
-const { data, error } = await unosend.contacts.import({
-  audienceId: 'audience_id',
-  file: base64CsvContent,
-  format: 'csv',
+// Validate with advanced options
+const { data, error } = await unosend.contacts.validate({
+  email: 'user@example.com',
+  checkSmtp: true,
+  checkCatchAll: true,
 });
 ```
 
@@ -203,8 +186,8 @@ const { data, error } = await unosend.contacts.import({
 // Create template
 const { data, error } = await unosend.templates.create({
   name: 'Welcome Email',
-  subject: 'Welcome {{name}}!',
-  html: '<h1>Hello {{name}}</h1>',
+  subject: 'Welcome {{first_name}}!',
+  html: '<h1>Hello {{first_name}}</h1>',
 });
 
 // List templates
@@ -218,12 +201,6 @@ const { data, error } = await unosend.templates.update('template_id', { subject:
 
 // Delete template
 const { data, error } = await unosend.templates.delete('template_id');
-
-// Render template with variables
-const { data, error } = await unosend.templates.render('template_id', { name: 'John' });
-
-// Duplicate template
-const { data, error } = await unosend.templates.duplicate('template_id', 'Copy of Welcome');
 ```
 
 ### Broadcasts
@@ -233,19 +210,16 @@ const { data, error } = await unosend.templates.duplicate('template_id', 'Copy o
 const { data, error } = await unosend.broadcasts.create({
   name: 'March Newsletter',
   subject: 'Our March Update',
-  from: 'news@yourdomain.com',
-  html: '<h1>Newsletter</h1>',
+  fromEmail: 'news@yourdomain.com',
   audienceId: 'audience_id',
+  htmlContent: '<h1>Newsletter</h1>',
 });
 
 // List broadcasts
-const { data, error } = await unosend.broadcasts.list();
+const { data, error } = await unosend.broadcasts.list({ status: 'draft' });
 
 // Get broadcast
 const { data, error } = await unosend.broadcasts.get('broadcast_id');
-
-// Update broadcast
-const { data, error } = await unosend.broadcasts.update('broadcast_id', { subject: 'Updated' });
 
 // Delete broadcast
 const { data, error } = await unosend.broadcasts.delete('broadcast_id');
@@ -270,7 +244,9 @@ const { data, error } = await unosend.webhooks.list();
 const { data, error } = await unosend.webhooks.get('webhook_id');
 
 // Update webhook
-const { data, error } = await unosend.webhooks.update('webhook_id', { enabled: false });
+const { data, error } = await unosend.webhooks.update('webhook_id', {
+  events: ['email.delivered', 'email.bounced', 'email.opened'],
+});
 
 // Delete webhook
 const { data, error } = await unosend.webhooks.delete('webhook_id');
@@ -280,21 +256,16 @@ const { data, error } = await unosend.webhooks.delete('webhook_id');
 
 ```typescript
 // List inbound emails
-const { data, error } = await unosend.inbound.list({ page: 1 });
+const { data, error, meta } = await unosend.inbound.list({ page: 1, perPage: 10 });
 
-// Get inbound email (with HTML content)
+// Get inbound email
 const { data, error } = await unosend.inbound.get('inbound_id');
 
-// Reply to inbound email
-const { data, error } = await unosend.inbound.reply('inbound_id', {
-  html: '<p>Thanks for your message!</p>',
-});
+// List attachments
+const { data, error } = await unosend.inbound.listAttachments('inbound_id');
 
-// Get replies
-const { data, error } = await unosend.inbound.replies('inbound_id');
-
-// Get attachments
-const { data, error } = await unosend.inbound.attachments('inbound_id');
+// Download attachment (returns raw Response)
+const response = await unosend.inbound.getAttachment('inbound_id', 'attachment_id');
 ```
 
 ### Suppressions
@@ -304,33 +275,16 @@ const { data, error } = await unosend.inbound.attachments('inbound_id');
 const { data, error } = await unosend.suppressions.create('bounce@example.com', 'hard_bounce');
 
 // List suppressions
-const { data, error } = await unosend.suppressions.list({ page: 1 });
+const { data, error, meta } = await unosend.suppressions.list({ page: 1, reason: 'hard_bounce' });
 
 // Get suppression
 const { data, error } = await unosend.suppressions.get('suppression_id');
 
-// Remove from suppression list
+// Remove suppression by ID
 const { data, error } = await unosend.suppressions.delete('suppression_id');
-```
 
-### Events & Logs
-
-```typescript
-// List events
-const { data, error } = await unosend.events.list({ days: 7, limit: 100 });
-
-// List email logs
-const { data, error } = await unosend.logs.list({ status: 'delivered', days: 30 });
-```
-
-### Metrics
-
-```typescript
-// Get email metrics
-const { data, error } = await unosend.metrics.get({ days: 30 });
-
-// Get link click metrics
-const { data, error } = await unosend.metrics.links({ days: 7, limit: 10 });
+// Remove suppression by email
+const { data, error } = await unosend.suppressions.deleteByEmail('bounce@example.com');
 ```
 
 ### API Keys
@@ -339,50 +293,14 @@ const { data, error } = await unosend.metrics.links({ days: 7, limit: 10 });
 // Create API key
 const { data, error } = await unosend.apiKeys.create('Production Key');
 
+// Create with permission level
+const { data, error } = await unosend.apiKeys.create('Read Only Key', 'read_only');
+
 // List API keys
 const { data, error } = await unosend.apiKeys.list();
 
 // Delete API key
 const { data, error } = await unosend.apiKeys.delete('key_id');
-```
-
-### Workspaces
-
-```typescript
-// Create workspace
-const { data, error } = await unosend.workspaces.create('My Workspace');
-
-// List workspaces
-const { data, error } = await unosend.workspaces.list();
-
-// Update workspace
-const { data, error } = await unosend.workspaces.update('workspace_id', { name: 'Renamed' });
-
-// Delete workspace
-const { data, error } = await unosend.workspaces.delete('workspace_id');
-```
-
-### Wallet & Subscription
-
-```typescript
-// Get wallet balance
-const { data, error } = await unosend.wallet.get();
-
-// Add funds
-const { data, error } = await unosend.wallet.addFunds(50);
-
-// View transactions
-const { data, error } = await unosend.wallet.transactions();
-
-// Get subscription info
-const { data, error } = await unosend.subscription.get();
-```
-
-### Usage
-
-```typescript
-// Get usage stats
-const { data, error } = await unosend.usage.get('2026-03');
 ```
 
 ## Error Handling

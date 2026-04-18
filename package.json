@@ -1,6 +1,6 @@
 {
   "name": "@unosend/node",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "Official Node.js SDK for Unosend - Email API for Developers",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
